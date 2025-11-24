@@ -1,0 +1,7 @@
+{
+  "description": "ESTUDE E ORE App",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "name": "ESTUDE E ORE"
+}
