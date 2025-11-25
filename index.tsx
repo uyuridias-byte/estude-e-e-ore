@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
@@ -29,7 +28,15 @@ import {
   Gauge,
   Headphones,
   Zap,
-  BookMarked
+  BookMarked,
+  HandHeart,
+  CheckCircle2,
+  Pause,
+  Square,
+  Trophy,
+  CalendarCheck,
+  Download,
+  Award
 } from "lucide-react";
 
 // --- Configuration ---
@@ -64,6 +71,14 @@ MODO: **JOVEM / AVIVADO**
 - Seja direto, motivador e use analogias atuais.
 `;
 
+const QUIZ_INSTRUCTION = `
+${BASE_SYSTEM_INSTRUCTION}
+MODO: **QUIZ MASTER**
+- Você irá gerar perguntas teológicas.
+- Retorne SEMPRE em formato JSON.
+- Niveis: Fácil, Médio, Difícil.
+`;
+
 const BIBLE_BOOKS = [
   "Gênesis", "Êxodo", "Levítico", "Números", "Deuteronômio", "Josué", "Juízes", "Rute", "1 Samuel", "2 Samuel", "1 Reis", "2 Reis", "1 Crônicas", "2 Crônicas", "Esdras", "Neemias", "Ester", "Jó", "Salmos", "Provérbios", "Eclesiastes", "Cânticos", "Isaías", "Jeremias", "Lamentações", "Ezequiel", "Daniel", "Oseias", "Joel", "Amós", "Obadias", "Jonas", "Miqueias", "Naum", "Habacuque", "Sofonias", "Ageu", "Zacarias", "Malaquias",
   "Mateus", "Marcos", "Lucas", "João", "Atos", "Romanos", "1 Coríntios", "2 Coríntios", "GÁLATAS", "Efésios", "Filipenses", "Colossenses", "1 Tessalonicenses", "2 Tessalonicenses", "1 Timóteo", "2 Timóteo", "Tito", "Filemom", "Hebreus", "Tiago", "1 Pedro", "2 Pedro", "1 João", "2 João", "3 João", "Judas", "Apocalipse"
@@ -75,16 +90,139 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('pt-BR', options);
 };
 
-const speakText = (text: string, rate: number = 1, pitch: number = 1) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*/g, "").replace(/\*/g, ""));
-    utterance.lang = "pt-BR";
-    utterance.rate = rate;
-    utterance.pitch = pitch; // 0.8 for deeper, 1.2 for higher
-    window.speechSynthesis.speak(utterance);
+// --- Custom Hooks ---
+
+// Improved TTS Hook with Pause/Stop
+const useAudioControls = () => {
+    const [speaking, setSpeaking] = useState(false);
+    const [paused, setPaused] = useState(false);
+    const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+    useEffect(() => {
+        const handleEnd = () => {
+            setSpeaking(false);
+            setPaused(false);
+        };
+        
+        // Cleanup on unmount
+        return () => {
+            window.speechSynthesis.cancel();
+        };
+    }, []);
+
+    const play = (text: string, rate: number = 1, pitch: number = 1) => {
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*/g, "").replace(/\*/g, ""));
+        utterance.lang = "pt-BR";
+        utterance.rate = rate;
+        utterance.pitch = pitch;
+        
+        utterance.onend = () => {
+            setSpeaking(false);
+            setPaused(false);
+        };
+
+        utteranceRef.current = utterance;
+        window.speechSynthesis.speak(utterance);
+        setSpeaking(true);
+        setPaused(false);
+    };
+
+    const pause = () => {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            window.speechSynthesis.pause();
+            setPaused(true);
+        }
+    };
+
+    const resume = () => {
+        if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+            setPaused(false);
+        }
+    };
+
+    const stop = () => {
+        window.speechSynthesis.cancel();
+        setSpeaking(false);
+        setPaused(false);
+    };
+
+    return { speaking, paused, play, pause, resume, stop };
 };
 
 // --- Components ---
+
+const Logo = ({ className = "w-10 h-10" }: { className?: string }) => (
+  <div className={`relative flex items-center justify-center ${className}`}>
+    <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-xl overflow-visible">
+      <defs>
+        <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#0ea5e9" />
+          <stop offset="100%" stopColor="#1d4ed8" />
+        </linearGradient>
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      
+      {/* Book Shape Background */}
+      <path d="M10,30 Q30,25 50,35 Q70,25 90,30 V85 Q70,75 50,85 Q30,75 10,85 Z" 
+            fill="url(#logoGrad)" stroke="#0ea5e9" strokeWidth="1" filter="url(#glow)" />
+      
+      {/* Spine/Center */}
+      <path d="M50,35 V85" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+
+      {/* Microphone Shape */}
+      <rect x="43" y="42" width="14" height="22" rx="7" fill="white" />
+      <path d="M38,58 Q38,70 50,70 Q62,70 62,58" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="50" y1="70" x2="50" y2="76" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="42" y1="76" x2="58" y2="76" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+
+      {/* Initials */}
+      <text x="20" y="68" fill="white" fontSize="22" fontWeight="bold" fontFamily="serif" fillOpacity="0.95">E</text>
+      <text x="66" y="68" fill="white" fontSize="22" fontWeight="bold" fontFamily="serif" fillOpacity="0.95">O</text>
+    </svg>
+  </div>
+);
+
+const AudioPlayerControls = ({ text, rate = 1, pitch = 1, label = "Ouvir", compact = false }: { text: string, rate?: number, pitch?: number, label?: string, compact?: boolean }) => {
+    const { speaking, paused, play, pause, resume, stop } = useAudioControls();
+
+    return (
+        <div className={`flex items-center gap-2 ${compact ? '' : 'bg-gray-800/50 p-2 rounded-lg inline-flex'}`}>
+            {!speaking ? (
+                <button 
+                    onClick={() => play(text, rate, pitch)}
+                    className={`${compact ? 'p-1 hover:text-brand-accent' : 'flex items-center gap-2 bg-white text-black px-4 py-2 rounded font-bold hover:bg-slate-200'} transition-colors`}
+                >
+                    <Play className={compact ? "h-4 w-4" : "h-4 w-4 fill-black"} />
+                    {!compact && <span>{label}</span>}
+                </button>
+            ) : (
+                <>
+                    {paused ? (
+                         <button onClick={resume} className={`${compact ? 'p-1 text-green-400' : 'bg-green-500/20 text-green-400 p-2 rounded hover:bg-green-500/30'}`}>
+                            <Play className="h-4 w-4 fill-current" />
+                         </button>
+                    ) : (
+                        <button onClick={pause} className={`${compact ? 'p-1 text-yellow-400' : 'bg-yellow-500/20 text-yellow-400 p-2 rounded hover:bg-yellow-500/30'}`}>
+                            <Pause className="h-4 w-4 fill-current" />
+                        </button>
+                    )}
+                    <button onClick={stop} className={`${compact ? 'p-1 text-red-400' : 'bg-red-500/20 text-red-400 p-2 rounded hover:bg-red-500/30'}`}>
+                        <Square className="h-4 w-4 fill-current" />
+                    </button>
+                </>
+            )}
+        </div>
+    );
+};
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center p-4">
@@ -177,17 +315,16 @@ const HomeTab = ({ onNavigate }: { onNavigate: (tab: any) => void }) => {
             </p>
             <p className="text-brand-accent font-bold text-lg mb-8">— {verseData.reference}</p>
             
-            <div className="flex gap-4">
-                <button 
-                    onClick={() => speakText(`${verseData.title}. ${verseData.text}. ${verseData.explanation}`, 1, 0.9)}
-                    className="bg-white text-black px-6 py-3 rounded hover:bg-slate-200 transition-colors flex items-center gap-2 font-bold text-sm md:text-base"
-                >
-                    <Play className="h-5 w-5 fill-black" />
-                    Ouvir Devocional
-                </button>
+            <div className="flex gap-4 items-center">
+                <AudioPlayerControls 
+                    text={`${verseData.title}. ${verseData.text}. ${verseData.explanation}`} 
+                    rate={1} 
+                    pitch={0.9} 
+                    label="Ouvir Devocional" 
+                />
                 <button 
                     onClick={() => onNavigate('chat')}
-                    className="bg-gray-600/60 backdrop-blur-sm text-white px-6 py-3 rounded hover:bg-gray-600/80 transition-colors flex items-center gap-2 font-bold text-sm md:text-base"
+                    className="bg-gray-600/60 backdrop-blur-sm text-white px-6 py-3 rounded hover:bg-gray-600/80 transition-colors flex items-center gap-2 font-bold text-sm md:text-base h-[40px] md:h-[48px]"
                 >
                     <MessageCircle className="h-5 w-5" />
                     Estudar Mais
@@ -221,6 +358,10 @@ const BibleTab = () => {
     const [selectedVerse, setSelectedVerse] = useState<{number: number, text: string} | null>(null);
     const [insight, setInsight] = useState<string | null>(null);
     const [insightLoading, setInsightLoading] = useState(false);
+    
+    // Reading Plan
+    const [showPlan, setShowPlan] = useState(false);
+    const [planProgress, setPlanProgress] = useState(0);
 
     // Save functionality
     const saveVerse = (vText: string, vNum: number) => {
@@ -285,11 +426,51 @@ const BibleTab = () => {
         fetchChapter();
     }, [book, chapter]);
 
+    useEffect(() => {
+        const p = localStorage.getItem('reading_plan_progress');
+        if (p) setPlanProgress(parseInt(p));
+    }, []);
+
+    const incrementPlan = () => {
+        const next = planProgress + 1;
+        setPlanProgress(next);
+        localStorage.setItem('reading_plan_progress', next.toString());
+    }
+
+    const generateImage = async () => {
+        const element = document.getElementById("share-card");
+        if (element && (window as any).html2canvas) {
+            try {
+                element.style.display = 'flex'; // Show momentarily
+                const canvas = await (window as any).html2canvas(element, { backgroundColor: null, scale: 2 });
+                element.style.display = 'none'; // Hide again
+                
+                const link = document.createElement('a');
+                link.download = `versiculo_${book}_${chapter}_${selectedVerse?.number}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+            } catch (err) {
+                console.error("Image generation failed", err);
+                alert("Erro ao gerar imagem.");
+            }
+        } else {
+            alert("Gerador de imagem carregando...");
+        }
+    }
+
     return (
         <div className="pt-20 px-4 md:px-12 pb-24 min-h-screen bg-brand-black">
-            <h2 className="text-2xl text-white font-bold mb-6 flex items-center gap-2 brand-font">
-                <BookOpen className="text-brand-accent" /> Bíblia Sagrada
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl text-white font-bold flex items-center gap-2 brand-font">
+                    <BookOpen className="text-brand-accent" /> Bíblia Sagrada
+                </h2>
+                <button 
+                    onClick={() => setShowPlan(true)}
+                    className="flex items-center gap-2 text-xs font-bold bg-gray-800 px-3 py-2 rounded-full hover:bg-gray-700 transition"
+                >
+                    <CalendarCheck className="h-4 w-4 text-brand-accent" /> Plano Anual
+                </button>
+            </div>
 
             {/* Controls */}
             <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
@@ -335,10 +516,36 @@ const BibleTab = () => {
                 </div>
             )}
 
+            {/* Reading Plan Modal */}
+            {showPlan && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowPlan(false)}>
+                    <div className="bg-[#18181b] w-full max-w-md rounded-xl p-6 border border-gray-800" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-white brand-font">Plano de Leitura</h3>
+                            <button onClick={() => setShowPlan(false)}><X className="text-gray-400" /></button>
+                        </div>
+                        <div className="text-center py-6">
+                            <div className="inline-block p-4 rounded-full bg-brand-accent/10 mb-4">
+                                <CalendarCheck className="h-10 w-10 text-brand-accent" />
+                            </div>
+                            <h4 className="text-lg font-bold text-white mb-2">Dia {planProgress + 1}</h4>
+                            <p className="text-gray-400 mb-6">Leia 3 capítulos hoje para completar a Bíblia em um ano.</p>
+                            <button 
+                                onClick={incrementPlan}
+                                className="bg-brand-accent text-white font-bold py-3 px-8 rounded-full hover:bg-brand-highlight transition-all"
+                            >
+                                Marcar Concluído
+                            </button>
+                            <p className="mt-4 text-xs text-gray-500">Total Lidos: {planProgress} dias</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Verse Action Modal */}
             {selectedVerse && (
                 <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setSelectedVerse(null)}>
-                    <div className="bg-[#18181b] w-full max-w-lg rounded-2xl md:rounded-xl overflow-hidden shadow-2xl border border-gray-800" onClick={e => e.stopPropagation()}>
+                    <div className="bg-[#18181b] w-full max-w-lg rounded-2xl md:rounded-xl overflow-hidden shadow-2xl border border-gray-800 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="p-6">
                             <div className="flex justify-between items-start mb-4">
                                 <h4 className="text-brand-accent font-bold brand-font">{book} {chapter}:{selectedVerse.number}</h4>
@@ -346,26 +553,29 @@ const BibleTab = () => {
                             </div>
                             <p className="serif-text text-xl text-white mb-8">"{selectedVerse.text}"</p>
                             
-                            <div className="grid grid-cols-3 gap-3 mb-6">
-                                <button 
-                                    onClick={() => speakText(selectedVerse.text, 0.9, 0.9)} // Slower, deeper
-                                    className="flex flex-col items-center gap-2 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition"
-                                >
-                                    <Volume2 className="h-6 w-6 text-brand-highlight" />
-                                    <span className="text-xs font-bold">Ouvir</span>
-                                </button>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                                <div className="flex justify-center">
+                                    <AudioPlayerControls text={selectedVerse.text} rate={0.9} pitch={0.9} compact={false} label="Ouvir" />
+                                </div>
                                 <button 
                                     onClick={() => { saveVerse(selectedVerse.text, selectedVerse.number); setSelectedVerse(null); }}
                                     className="flex flex-col items-center gap-2 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition"
                                 >
-                                    <Bookmark className="h-6 w-6 text-brand-highlight" />
+                                    <Bookmark className="h-5 w-5 text-brand-highlight" />
                                     <span className="text-xs font-bold">Salvar</span>
+                                </button>
+                                <button 
+                                    onClick={generateImage}
+                                    className="flex flex-col items-center gap-2 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition"
+                                >
+                                    <Share2 className="h-5 w-5 text-purple-400" />
+                                    <span className="text-xs font-bold">Postar</span>
                                 </button>
                                 <button 
                                     onClick={() => fetchInsight(selectedVerse.text, selectedVerse.number)}
                                     className="flex flex-col items-center gap-2 p-3 bg-brand-accent/20 border border-brand-accent/50 rounded-lg hover:bg-brand-accent/30 transition"
                                 >
-                                    <Sparkles className="h-6 w-6 text-brand-accent" />
+                                    <Sparkles className="h-5 w-5 text-brand-accent" />
                                     <span className="text-xs font-bold text-brand-accent">Estudar</span>
                                 </button>
                             </div>
@@ -381,12 +591,7 @@ const BibleTab = () => {
                                         <div className="text-sm text-gray-300 space-y-2">
                                             <MarkdownRenderer content={insight || ""} />
                                             <div className="mt-2 pt-2 border-t border-gray-700 flex justify-end">
-                                                 <button 
-                                                    onClick={() => speakText(insight || "", 1, 0.9)}
-                                                    className="text-xs flex items-center gap-1 text-gray-400 hover:text-white"
-                                                >
-                                                    <Play className="h-3 w-3" /> Ouvir Estudo
-                                                </button>
+                                                 <AudioPlayerControls text={insight || ""} rate={1} pitch={0.9} label="Ouvir Estudo" compact={true} />
                                             </div>
                                         </div>
                                     )}
@@ -396,11 +601,145 @@ const BibleTab = () => {
                     </div>
                 </div>
             )}
+
+            {/* Hidden Card for Image Generation */}
+            {selectedVerse && (
+                <div id="share-card" style={{display: 'none'}} className="fixed top-0 left-0 w-[600px] h-[600px] bg-gradient-to-br from-brand-black to-blue-900 flex-col justify-center items-center p-12 text-center z-[-1]">
+                     <Logo className="w-24 h-24 mb-6" />
+                     <p className="text-white text-3xl font-serif italic leading-relaxed mb-6">"{selectedVerse.text}"</p>
+                     <p className="text-brand-accent text-xl font-bold uppercase tracking-widest">{book} {chapter}:{selectedVerse.number}</p>
+                     <div className="absolute bottom-6 text-gray-400 text-sm">ESTUDE E ORE APP</div>
+                </div>
+            )}
         </div>
     );
 };
 
-// 3. SAVED TAB
+// 3. QUIZ TAB (NEW)
+const QuizTab = () => {
+    const [score, setScore] = useState(0);
+    const [question, setQuestion] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+
+    const generateQuestion = async () => {
+        setLoading(true);
+        setFeedback(null);
+        setQuestion(null);
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const prompt = `
+                Gere uma pergunta teológica de múltipla escolha (A, B, C, D).
+                Retorne APENAS JSON:
+                {
+                    "q": "Pergunta?",
+                    "options": ["A", "B", "C", "D"],
+                    "correct": 0,
+                    "explanation": "Por que está correta?"
+                }
+            `;
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: { responseMimeType: "application/json", systemInstruction: QUIZ_INSTRUCTION }
+            });
+            setQuestion(JSON.parse(response.text));
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAnswer = (idx: number) => {
+        if (!question || feedback) return;
+        if (idx === question.correct) {
+            setFeedback('correct');
+            setScore(s => s + 10);
+            const audio = new Audio('https://codeskulptor-demos.commondatastorage.googleapis.com/pang/pop.mp3');
+            audio.play().catch(e=>{});
+        } else {
+            setFeedback('wrong');
+        }
+    };
+
+    return (
+        <div className="pt-20 px-4 md:px-12 pb-24 min-h-screen bg-brand-black">
+             <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl text-white font-bold flex items-center gap-2 brand-font">
+                    <Trophy className="text-yellow-500" /> Quiz Bíblico
+                </h2>
+                <div className="bg-yellow-500/10 px-4 py-2 rounded-full border border-yellow-500/30 flex items-center gap-2">
+                    <Award className="h-5 w-5 text-yellow-500" />
+                    <span className="text-yellow-500 font-bold">{score} XP</span>
+                </div>
+            </div>
+
+            <div className="max-w-2xl mx-auto">
+                {!question && !loading && (
+                    <div className="text-center py-12">
+                        <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Zap className="h-10 w-10 text-brand-accent" />
+                        </div>
+                        <h3 className="text-xl text-white font-bold mb-4">Teste seus conhecimentos</h3>
+                        <p className="text-gray-400 mb-8">Responda perguntas e ganhe medalhas de conhecimento teológico.</p>
+                        <button 
+                            onClick={generateQuestion}
+                            className="bg-brand-accent text-white font-bold py-3 px-8 rounded-full hover:bg-brand-highlight transition-all"
+                        >
+                            Começar Desafio
+                        </button>
+                    </div>
+                )}
+
+                {loading && (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <Loader2 className="animate-spin h-10 w-10 text-brand-accent mb-4" />
+                        <p className="text-gray-400">O Mentor está elaborando uma pergunta...</p>
+                    </div>
+                )}
+
+                {question && (
+                    <div className="bg-[#18181b] p-6 rounded-xl border border-gray-800 shadow-xl animate-fade-in">
+                         <h3 className="text-xl font-bold text-white mb-6 leading-relaxed">{question.q}</h3>
+                         <div className="space-y-3">
+                             {question.options.map((opt: string, idx: number) => (
+                                 <button
+                                    key={idx}
+                                    onClick={() => handleAnswer(idx)}
+                                    disabled={!!feedback}
+                                    className={`w-full text-left p-4 rounded-lg border transition-all
+                                        ${feedback === null ? 'bg-gray-800 border-gray-700 hover:border-brand-accent' : ''}
+                                        ${feedback === 'correct' && idx === question.correct ? 'bg-green-900/30 border-green-500 text-green-100' : ''}
+                                        ${feedback === 'wrong' && idx === question.correct ? 'bg-green-900/30 border-green-500' : ''}
+                                        ${feedback === 'wrong' && idx !== question.correct ? 'opacity-50' : ''}
+                                    `}
+                                 >
+                                     <span className="font-bold mr-2 opacity-50">{['A','B','C','D'][idx]}.</span> {opt}
+                                 </button>
+                             ))}
+                         </div>
+                         
+                         {feedback && (
+                             <div className={`mt-6 p-4 rounded-lg ${feedback === 'correct' ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400'}`}>
+                                 <p className="font-bold mb-2">{feedback === 'correct' ? 'Resposta Correta! +10 XP' : 'Resposta Incorreta.'}</p>
+                                 <p className="text-sm text-gray-300">{question.explanation}</p>
+                                 <button 
+                                    onClick={generateQuestion}
+                                    className="mt-4 bg-gray-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-gray-600 w-full"
+                                 >
+                                     Próxima Pergunta
+                                 </button>
+                             </div>
+                         )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// 4. SAVED TAB
 const SavedTab = () => {
     const [saved, setSaved] = useState<{id: number, ref: string, text: string, date: string}[]>([]);
 
@@ -434,11 +773,125 @@ const SavedTab = () => {
                             <button onClick={() => remove(item.id)} className="text-gray-600 hover:text-red-500"><X className="h-4 w-4"/></button>
                         </div>
                         <p className="text-slate-300 serif-text text-sm mb-4 line-clamp-4">"{item.text}"</p>
-                        <span className="text-xs text-gray-600 block text-right">{new Date(item.date).toLocaleDateString()}</span>
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">{new Date(item.date).toLocaleDateString()}</span>
+                            <AudioPlayerControls text={item.text} rate={1} pitch={1} compact={true} />
+                        </div>
                     </div>
                 ))}
             </div>
         </div>
+    );
+};
+
+// 5. PRAYER TAB
+const PrayerTab = () => {
+    const [prayers, setPrayers] = useState<{id: number, request: string, prayer: string, date: string, answered: boolean}[]>([]);
+    const [newRequest, setNewRequest] = useState("");
+    const [generating, setGenerating] = useState(false);
+
+    useEffect(() => {
+        const load = () => {
+            const data = JSON.parse(localStorage.getItem('prayers') || '[]');
+            setPrayers(data);
+        };
+        load();
+    }, []);
+
+    const savePrayers = (data: any[]) => {
+        setPrayers(data);
+        localStorage.setItem('prayers', JSON.stringify(data));
+    };
+
+    const handleCreatePrayer = async () => {
+        if(!newRequest.trim()) return;
+        setGenerating(true);
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const prompt = `Escreva uma oração fervorosa, curta e bíblica (100 palavras) para este pedido: "${newRequest}". Use tom pastoral e encorajador.`;
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: { systemInstruction: PASTORAL_INSTRUCTION }
+            });
+
+            const newItem = {
+                id: Date.now(),
+                request: newRequest,
+                prayer: response.text,
+                date: new Date().toISOString(),
+                answered: false
+            };
+            savePrayers([newItem, ...prayers]);
+            setNewRequest("");
+        } catch(e) {
+            console.error(e);
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const toggleAnswered = (id: number) => {
+        const updated = prayers.map(p => p.id === id ? {...p, answered: !p.answered} : p);
+        savePrayers(updated);
+    };
+
+    const deletePrayer = (id: number) => {
+         const updated = prayers.filter(p => p.id !== id);
+         savePrayers(updated);
+    };
+
+    return (
+         <div className="pt-20 px-4 md:px-12 pb-24 min-h-screen bg-brand-black">
+            <h2 className="text-2xl text-white font-bold mb-6 flex items-center gap-2 brand-font">
+                <HandHeart className="text-brand-accent" /> Sala de Oração
+            </h2>
+
+            {/* Input */}
+            <div className="bg-[#18181b] p-6 rounded-xl border border-gray-800 mb-8 shadow-lg">
+                <h3 className="text-white font-bold mb-2">Qual seu pedido hoje?</h3>
+                <div className="flex gap-2">
+                    <input 
+                        type="text" 
+                        value={newRequest}
+                        onChange={(e) => setNewRequest(e.target.value)}
+                        placeholder="Ex: Cura para minha família, direção no emprego..."
+                        className="flex-1 bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-accent outline-none"
+                    />
+                    <button 
+                        onClick={handleCreatePrayer}
+                        disabled={generating || !newRequest.trim()}
+                        className="bg-brand-accent hover:bg-brand-highlight text-white px-6 rounded-lg font-bold disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {generating ? <Loader2 className="animate-spin h-5 w-5"/> : <Send className="h-5 w-5"/>}
+                    </button>
+                </div>
+            </div>
+
+            {/* List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {prayers.map(item => (
+                    <div key={item.id} className={`p-5 rounded-lg border transition-all ${item.answered ? 'bg-green-900/10 border-green-800' : 'bg-[#18181b] border-gray-800'}`}>
+                        <div className="flex justify-between items-start mb-3">
+                            <span className="text-gray-400 text-xs font-bold uppercase">{new Date(item.date).toLocaleDateString()}</span>
+                            <div className="flex gap-2">
+                                <button onClick={() => toggleAnswered(item.id)} className={`${item.answered ? 'text-green-500' : 'text-gray-600 hover:text-green-500'}`} title="Marcar como Testemunho">
+                                    <CheckCircle2 className="h-5 w-5" />
+                                </button>
+                                <button onClick={() => deletePrayer(item.id)} className="text-gray-600 hover:text-red-500"><Trash2 className="h-5 w-5"/></button>
+                            </div>
+                        </div>
+                        <h4 className="text-white font-bold mb-2 brand-font">"{item.request}"</h4>
+                        <div className="bg-black/30 p-3 rounded text-slate-300 text-sm italic mb-3 serif-text leading-relaxed">
+                            {item.prayer}
+                        </div>
+                        <div className="flex justify-end">
+                            <AudioPlayerControls text={item.prayer} rate={0.9} pitch={0.9} label="Orar Junto" compact={false} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+         </div>
     );
 };
 
@@ -495,7 +948,7 @@ const exportToPdf = (q: string, a: string) => {
     }
 };
 
-// 4. CHAT TAB (MENTOR)
+// 6. CHAT TAB (MENTOR)
 interface ChatSession {
     id: string;
     title: string;
@@ -657,34 +1110,34 @@ const LiveVoiceMode = ({ onClose, onMessageCaptured, style }: { onClose: () => v
                 <X className="h-8 w-8" />
             </button>
             
-            <div className="text-center space-y-8">
+            <div className="text-center space-y-8 flex flex-col items-center">
                 <h3 className="text-2xl font-bold text-brand-accent brand-font">
                     {style === 'pastoral' ? 'Modo Pastoral' : 'Modo Jovem'}
                 </h3>
                 
-                <div className="relative flex justify-center items-center h-40 w-40">
+                <div className="relative flex justify-center items-center h-48 w-48 my-8">
                     <div 
                         className={`absolute rounded-full transition-all duration-75 ${style === 'pastoral' ? 'bg-blue-900/30' : 'bg-orange-500/30'}`}
-                        style={{ width: `${100 + volume * 2}px`, height: `${100 + volume * 2}px` }}
+                        style={{ width: `${140 + volume * 2.5}px`, height: `${140 + volume * 2.5}px` }}
                     />
                     <div 
                         className={`absolute rounded-full transition-all duration-75 ${style === 'pastoral' ? 'bg-blue-600/50' : 'bg-orange-500/50'}`}
-                        style={{ width: `${80 + volume}px`, height: `${80 + volume}px` }}
+                        style={{ width: `${120 + volume * 1.5}px`, height: `${120 + volume * 1.5}px` }}
                     />
-                    <div className={`relative z-10 p-6 rounded-full shadow-[0_0_30px_rgba(14,165,233,0.5)] ${style === 'pastoral' ? 'bg-brand-accent' : 'bg-orange-500'}`}>
-                         <Mic className="h-12 w-12 text-white" />
+                    <div className={`relative z-10 p-6 rounded-full shadow-[0_0_40px_rgba(14,165,233,0.6)] ${style === 'pastoral' ? 'bg-brand-accent' : 'bg-orange-500'}`}>
+                         <Logo className="w-16 h-16" />
                     </div>
                 </div>
 
                 <p className="text-gray-400 max-w-md mx-auto">
                     {connected 
-                        ? "O Mentor está ouvindo..." 
+                        ? "O Mentor está ouvindo... Fale sua dúvida." 
                         : "Conectando ao Mentor..."}
                 </p>
 
                 <p className="text-xs text-gray-500">Conversa sendo transcrita para o histórico.</p>
 
-                <button onClick={onClose} className="bg-red-500/20 text-red-500 border border-red-500/50 px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-red-500/30 mx-auto">
+                <button onClick={onClose} className="bg-red-500/20 text-red-500 border border-red-500/50 px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-red-500/30 mx-auto transition-colors">
                     <StopCircle className="h-5 w-5" /> Encerrar
                 </button>
             </div>
@@ -939,9 +1392,7 @@ const ChatTab = () => {
                             {msg.role === 'model' && (
                                 <>
                                     <div className="flex items-center bg-gray-800/50 rounded px-1 ml-1 gap-1">
-                                        <button onClick={() => speakText(msg.content, ttsRate, 0.9)} className="hover:text-white p-1" title={`Ouvir (${ttsRate}x)`}>
-                                            <Volume2 className="h-3 w-3"/>
-                                        </button>
+                                         <AudioPlayerControls text={msg.content} rate={ttsRate} pitch={0.9} compact={true} />
                                         <button 
                                             onClick={toggleRate} 
                                             className="hover:text-white text-[10px] font-bold min-w-[24px] text-center" 
@@ -1016,7 +1467,7 @@ const ChatTab = () => {
 
 // --- Main App Shell ---
 const App = () => {
-  const [activeTab, setActiveTab] = useState<'home' | 'bible' | 'chat' | 'saved'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'bible' | 'chat' | 'prayer' | 'saved' | 'quiz'>('home');
 
   return (
     <div className="bg-brand-black min-h-screen text-gray-200 font-sans selection:bg-brand-accent selection:text-white">
@@ -1033,13 +1484,13 @@ const App = () => {
                 <button onClick={() => setActiveTab('home')} className={`hover:text-white transition ${activeTab === 'home' ? 'text-white' : ''}`}>Início</button>
                 <button onClick={() => setActiveTab('bible')} className={`hover:text-white transition ${activeTab === 'bible' ? 'text-white' : ''}`}>Bíblia</button>
                 <button onClick={() => setActiveTab('chat')} className={`hover:text-white transition ${activeTab === 'chat' ? 'text-white' : ''}`}>Estudo</button>
+                <button onClick={() => setActiveTab('quiz')} className={`hover:text-white transition ${activeTab === 'quiz' ? 'text-white' : ''}`}>Quiz</button>
+                <button onClick={() => setActiveTab('prayer')} className={`hover:text-white transition ${activeTab === 'prayer' ? 'text-white' : ''}`}>Oração</button>
                 <button onClick={() => setActiveTab('saved')} className={`hover:text-white transition ${activeTab === 'saved' ? 'text-white' : ''}`}>Salvos</button>
             </nav>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-brand-accent to-blue-700 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-brand-accent/20">
-                EO
-            </div>
+            <Logo className="w-9 h-9" />
           </div>
         </div>
       </header>
@@ -1048,6 +1499,8 @@ const App = () => {
         {activeTab === 'home' && <HomeTab onNavigate={setActiveTab} />}
         {activeTab === 'bible' && <BibleTab />}
         {activeTab === 'chat' && <ChatTab />}
+        {activeTab === 'quiz' && <QuizTab />}
+        {activeTab === 'prayer' && <PrayerTab />}
         {activeTab === 'saved' && <SavedTab />}
       </main>
 
@@ -1062,8 +1515,11 @@ const App = () => {
             <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'chat' ? 'text-brand-accent' : 'text-gray-500'}`}>
                 <MessageCircle className="h-5 w-5" /> Estudo
             </button>
-            <button onClick={() => setActiveTab('saved')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'saved' ? 'text-brand-accent' : 'text-gray-500'}`}>
-                <Library className="h-5 w-5" /> Salvos
+            <button onClick={() => setActiveTab('quiz')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'quiz' ? 'text-brand-accent' : 'text-gray-500'}`}>
+                <Trophy className="h-5 w-5" /> Quiz
+            </button>
+             <button onClick={() => setActiveTab('prayer')} className={`flex flex-col items-center gap-1 text-xs ${activeTab === 'prayer' ? 'text-brand-accent' : 'text-gray-500'}`}>
+                <HandHeart className="h-5 w-5" /> Oração
             </button>
         </div>
       </nav>
